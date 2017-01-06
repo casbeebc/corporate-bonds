@@ -6,7 +6,8 @@
 from scrapy.item import Item, Field
 
 class BondItem(Item):
-    pass
+    url = Field()
+    
     """
     # define the fields for your item here like:
     state   = Field()

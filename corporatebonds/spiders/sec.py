@@ -3,7 +3,6 @@ import re
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy import Request
 from scrapy.selector import Selector
-from scrapy.item import Item
 from scrapy.linkextractors import LinkExtractor
 
 from corporatebonds.items import BondItem
@@ -21,16 +20,16 @@ class SecSpider(CrawlSpider):
         self.initial_item_count = 100
         self.current_item_count = 0
         
+    
     def parse(self, response):
-        self.parse_sec_page(response)
-        #https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0000029915&type=&dateb=&owner=exclude&start=1300&count=100
+        yield self.get_prospectus_url(response)
         page = response.xpath("//div[@id='contentDiv']/div/form/table/tr/td/input[@value='Next 100']").extract_first()
         if page:
             self.current_item_count += self.initial_item_count
             url = self.url_template + "&start=%s" % self.current_item_count
-            yield Request(response.urljoin(url), callback=self.parse)
-    
-    def parse_sec_page(self, response):
+            yield Request(response.urljoin(url), callback=self.get_prospectus_url)
+        
+    def get_prospectus_url(self, response):
         foundProspectus = False
         
         for searchText in response.xpath("//*[contains(text(),'Ratio of Earnings')]"):
@@ -38,14 +37,14 @@ class SecSpider(CrawlSpider):
             break
             
         if foundProspectus:
-            item = scrapy.Item()
+            item = BondItem()
             item['url'] = response.url
-            return item        
+            return item
             
         for url in response.xpath("//table[@summary='Document Format Files']/tr/td/a/@href").extract():
             if re.compile(r".*\.htm").match(url) is not None:
-                yield Request(response.urljoin(url), callback=self.parse_sec_page)
+                yield Request(response.urljoin(url), callback=self.get_prospectus_url)
           
         for url in response.xpath("//table[@summary='Results']/tr/td[2]/a/@href").extract():
-            yield Request(response.urljoin(url), callback=self.parse_sec_page)
+            yield Request(response.urljoin(url), callback=self.get_prospectus_url)
             
